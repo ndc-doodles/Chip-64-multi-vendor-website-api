@@ -1,0 +1,17 @@
+const express=require("express")
+const router=express.Router()
+const {listProducts,getProduct,getShopProducts}=require("../Controllers/productController")
+const{getCategoriesUser}=require("../Controllers/categoryController")
+const {getCart,addItem,updateItemQty,removeItem,clearCart}=require("../Controllers/cartController")
+const {protect,isAdmin}=require("../Middleware/authMiddleware")
+
+router.get("/products",listProducts)
+router.get("/products/:slug",protect,getProduct)
+router.get("/categories",getCategoriesUser)
+router.get("/products-shop",getShopProducts)
+router.get("/cart",protect,getCart)
+router.post("/cart/items",protect,addItem)
+router.patch("/cart/items/:itemId",protect,updateItemQty)
+router.delete("/cart/items/:itemId",protect,removeItem)
+router.delete("/cart",clearCart)
+module.exports=router

@@ -3,7 +3,7 @@ const {
   generateRefreshToken,
 } = require("./generateTokens");
 //sending tokens to frontend
-const sendTokens = (user, res, statusCode = 200) => {
+const sendTokens = (user, res,type="user", statusCode = 200) => {
   const accessToken = generateAccessToken(user);
   const refreshToken = generateRefreshToken(user);
 
