@@ -1,6 +1,7 @@
 const Cart=require("../Models/cartModel")
 const mongoose=require("mongoose")
-
+const Product=require("../Models/productModel")
+const BuyNow=require("../Models/buyNowModel")
 const getCart = async (req, res) => {
   try {
     const userId = req.user?.id;
@@ -19,19 +20,43 @@ const getCart = async (req, res) => {
 const addItem = async (req, res) => {
   try {
     const userId = req.user?.id;
-    console.log(req.user)
     if (!userId)
       return res.status(401).json({ success: false, message: "Unauthorized" });
+     console.log(req.body)
+    const {
+      productId,
+      vendorId,
+      qty = 1,
+      price,
+      name,
+      slug,
+      image,
+      attributes,
+      variantId // 🔑 THIS IS THE VARIANT
+    } = req.body;
+     console.log(variantId)
+    if (!productId || !vendorId || price == null|| !variantId) {
+      return res.status(400).json({
+        success: false,
+        message: "productId, vendorId , variantId and price are required",
+      });
+    }
+        await BuyNow.deleteOne({ user: userId });
 
-    const { productId, variantId, qty = 1, price, name, slug, image, size, color, options } = req.body;
-
-
-    if (!productId || price == null)
-      return res.status(400).json({ success: false, message: "productId + price required" });
 
     const cart = await Cart.findOrCreateFor({ userId });
 
-    await cart.addItem({ productId, variantId, qty, price, name, slug, image ,size,color});
+    await cart.addItem({
+      productId,
+      vendorId,
+      qty,
+      price,
+      name,
+      slug,
+      image,
+      attributes,
+      variantId 
+    });
 
     return res.json({ success: true, cart });
   } catch (err) {
@@ -39,6 +64,7 @@ const addItem = async (req, res) => {
     return res.status(500).json({ success: false, message: err.message });
   }
 };
+
 
 const updateItemQty = async (req, res) => {
   try {
@@ -92,4 +118,25 @@ const clearCart = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 };
- module.exports={getCart,clearCart,removeItem,addItem,updateItemQty}
+const getCartRecommendations = async (req, res) => {
+  const { cartProductIds } = req.body;
+
+  const cartProducts = await Product.find({
+    _id: { $in: cartProductIds }
+  }).select("category");
+
+  const categories = [
+    ...new Set(cartProducts.map(p => p.category.toString()))
+  ];
+
+  const recommendations = await Product.find({
+    category: { $in: categories },
+    _id: { $nin: cartProductIds },
+    isActive: true
+  })
+    .limit(3)
+    .select("name basePrice mainImage category slug");
+   console.log(recommendations)
+  res.json(recommendations);
+};
+ module.exports={getCart,clearCart,removeItem,addItem,updateItemQty,getCartRecommendations}

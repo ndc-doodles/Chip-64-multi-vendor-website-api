@@ -2,57 +2,99 @@ const Category= require("../Models/categoryModel")
 const cloudinary= require("../Config/cloudinary")
 const streamifier=require("streamifier")
 const { uploadBufferToCloudinary} = require("../Utils/cloudinaryHelper"); // see helper below
-
-
+const slugify=require("slugify")
+const mongoose=require("mongoose")
 const createCategory = async (req, res) => {
   try {
-    const nameRaw = req.body.name || "";
-    const name = nameRaw.trim();
-    const description = req.body.description || "";
+    const { name, description, parentCategory, isActive } = req.body;
 
-    console.log("name and description:", JSON.stringify({ nameRaw, name, description }));
-
-    if (!name) {
-      return res.status(400).json({ message: "Category name is not provided" });
+    // 1️⃣ Validate name
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: "Category name is required" });
     }
 
-    // case-insensitive exact match (safer)
-    const existing = await Category.findOne({
-      name: { $regex: `^${escapeRegExp(name)}$`, $options: "i" }
-    });
+    const trimmedName = name.trim();
+    const isSubCategory = !!parentCategory;
 
-    console.log("findOne returned:", existing);
-    if (existing) {
-      return res.status(400).json({ message: "Category already exists" });
+    // 2️⃣ Validate parent category (if sub-category)
+    if (isSubCategory) {
+      if (!mongoose.isValidObjectId(parentCategory)) {
+        return res.status(400).json({ message: "Invalid parent category id" });
+      }
+
+      const parent = await Category.findOne({
+        _id: parentCategory,
+        parentCategory: null, // must be a parent category
+      });
+
+      if (!parent) {
+        return res.status(404).json({
+          message: "Parent category not found",
+        });
+      }
     }
 
+    // 3️⃣ Enforce image rules
+    if (isSubCategory && req.file) {
+      return res.status(400).json({
+        message: "Sub categories cannot have images",
+      });
+    }
+
+    // 4️⃣ Upload image ONLY for parent category
     let imageUrl = "";
-    console.log("RELOADED cloudinary require -> typeof:", typeof cloudinary);
-console.log("cloudinary keys:", cloudinary && Object.keys(cloudinary).slice(0,20));
-console.log("cloudinary.uploader:", cloudinary && cloudinary.uploader);
-    if (req.file && req.file.buffer) {
-      const publicIdSafe = name.toLowerCase().replace(/[^a-z0-9\-]/g, "-").substring(0, 200);
-      // make sure uploadBufferToCloudinary returns a promise and we await it
-      const result = await uploadBufferToCloudinary(req.file.buffer, publicIdSafe);
-      imageUrl = result?.secure_url || result?.url || "";
-    }
+   if (!isSubCategory && req.file) {
+  const upload = await uploadBufferToCloudinary(
+    req.file.buffer,
+    "categories",
+    `category-${Date.now()}`
+  );//changed
 
-    const category = await Category.create({
-      name,
-      description,
-      image: imageUrl,
-      isActive: true,
+  imageUrl = upload.secure_url;
+}
+
+
+    // 5️⃣ Generate slug (GLOBAL)
+    const slug = trimmedName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "");
+
+    // 6️⃣ Prevent duplicate category (GLOBAL)
+    const exists = await Category.findOne({
+      name: { $regex: `^${escapeRegExp(trimmedName)}$`, $options: "i" },
+      parentCategory: isSubCategory ? parentCategory : null,
     });
 
-    return res.status(201).json({ success: true, category });
+    if (exists) {
+      return res.status(409).json({
+        message: "Category already exists under this parent",
+      });
+    }
+
+    // 7️⃣ Create category
+    const category = await Category.create({
+      name: trimmedName,
+      slug,
+      description: description || "",
+      image: imageUrl, // empty for sub-category
+      parentCategory: isSubCategory ? parentCategory : null,
+      isActive: isActive !== "false",
+    });
+
+    return res.status(201).json({
+      success: true,
+      category,
+    });
   } catch (err) {
     console.error("createCategory error:", err);
-    if (err && err.code === 11000) {
-      return res.status(409).json({ success: false, message: "Duplicate key — category exists" });
-    }
-    return res.status(500).json({ success: false, message: err?.message || "Server error" });
+    return res.status(500).json({
+      success: false,
+      message: err?.message || "Server error",
+    });
   }
 };
+
 
 function escapeRegExp(string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -61,7 +103,7 @@ function escapeRegExp(string) {
 
 const getCategories = async(req,res)=>{
     try {
-        const categories=await Category.find().sort({createdAt:-1}).lean()
+        const categories=await Category.find().populate("parentCategory","_id name slug").sort({createdAt:-1}).lean()
         res.json({success:true,categories})
     } catch (error) {
         console.error("getCategories error:",err);
@@ -72,8 +114,8 @@ const getCategories = async(req,res)=>{
 const getCategoriesUser=async (req, res) => {
   try {
     const categories = await Category.find({ isActive: true })
-      .sort({ createdAt: -1 })
-      .select("_id name image") // only what public UI needs
+      .sort({ priorityOrder:1 })
+      .select("_id name image parentCategory slug") 
       .lean();
     return res.json({ success: true, categories });
   } catch (error) {
@@ -81,6 +123,42 @@ const getCategoriesUser=async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 }
+const getShopCategories = async (req, res) => {
+  try {
+    const categories = await Category.find({ isActive: true })
+      .select("_id name parentCategory")
+      .lean();
+
+    // parents only
+    const parents = categories.filter(
+      (c) => c.parentCategory === null
+    );
+
+    const formatted = parents.map((parent) => ({
+      id: parent._id,
+      name: parent.name,
+      subcategories: categories
+        .filter(
+          (c) =>
+            c.parentCategory &&
+            c.parentCategory.toString() === parent._id.toString()
+        )
+        .map((child) => ({
+          id: child._id,
+          name: child.name,
+        })),
+    }));
+
+    res.json({
+      success: true,
+      categories: formatted,
+    });
+  } catch (err) {
+    console.error("getShopCategories error:", err);
+    res.status(500).json({ success: false });
+  }
+};
+
 const toggleCategory=async (req,res)=>{
     try {
         const {id}=req.params;
@@ -100,57 +178,100 @@ const toggleCategory=async (req,res)=>{
 const updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!id) return res.status(400).json({ success: false, message: "Category id required" });
+    const { name, description, parentCategory, isActive } = req.body;
 
+    // 1️⃣ Validate category id
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ message: "Invalid category id" });
+    }
+
+    // 2️⃣ Find category (GLOBAL, admin-owned)
     const category = await Category.findById(id);
-    if (!category) return res.status(404).json({ success: false, message: "Category not found" });
+    if (!category) {
+      return res.status(404).json({ message: "Category not found" });
+    }
 
-    // normalize fields
-    const nameRaw = req.body.name;
-    if (typeof nameRaw === "string") {
-      const name = nameRaw.trim();
-      if (!name) return res.status(400).json({ success: false, message: "Name cannot be empty" });
+    const isSubCategory = !!parentCategory;
 
-      // check duplicates excluding current doc (case-insensitive exact)
-      const dup = await Category.findOne({
-        name: { $regex: `^${escapeRegExp(name)}$`, $options: "i" },
+    // 3️⃣ Validate parent category (if sub-category)
+    if (isSubCategory) {
+      if (!mongoose.isValidObjectId(parentCategory)) {
+        return res.status(400).json({ message: "Invalid parent category id" });
+      }
+
+      const parent = await Category.findOne({
+        _id: parentCategory,
+        parentCategory: null, // must be a parent category
+      });
+
+      if (!parent) {
+        return res.status(404).json({
+          message: "Parent category not found",
+        });
+      }
+    }
+
+    // 4️⃣ Enforce image rules
+    if (isSubCategory && req.file) {
+      return res.status(400).json({
+        message: "Sub categories cannot have images",
+      });
+    }
+
+    // 5️⃣ Upload image ONLY for parent category
+   if (!isSubCategory && req.file) {
+  const upload = await uploadBufferToCloudinary(
+    req.file.buffer,
+    "categories",
+    `category-${Date.now()}`
+  );
+
+  category.image = upload.secure_url;
+}
+
+
+    // 6️⃣ Update name & slug (with duplicate check)
+    if (name && name.trim()) {
+      const trimmedName = name.trim();
+
+      const exists = await Category.findOne({
+        name: { $regex: `^${escapeRegExp(trimmedName)}$`, $options: "i" },
+        parentCategory: isSubCategory ? parentCategory : null,
         _id: { $ne: id },
       });
 
-      if (dup) return res.status(400).json({ success: false, message: "Another category with this name exists" });
+      if (exists) {
+        return res.status(409).json({
+          message: "Category already exists under this parent",
+        });
+      }
 
-      category.name = name;
+      category.name = trimmedName;
+      category.slug = trimmedName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "");
     }
 
-    if (typeof req.body.description === "string") {
-      category.description = req.body.description;
-    }
+    // 7️⃣ Update remaining fields
+    category.description = description || "";
+    category.parentCategory = isSubCategory ? parentCategory : null;
+    category.isActive = isActive !== "false";
 
-    if (typeof req.body.isActive !== "undefined") {
-      // allow string "true"/"false" etc.
-      const val = req.body.isActive;
-      category.isActive = val === "true" || val === true ? true : val === "false" || val === false ? false : category.isActive;
-    }
-
-    // If new file provided, upload and replace image URL
-    if (req.file && req.file.buffer) {
-      const publicIdSafe = (category.name || "category").toLowerCase().replace(/[^a-z0-9\-]/g, "-").substring(0, 200);
-      const result = await uploadBufferToCloudinary(req.file.buffer, publicIdSafe);
-      const imageUrl = result?.secure_url || result?.url || "";
-      // OPTIONAL: delete old Cloudinary public_id if you store it separately
-      // e.g. if you saved public_id in model, call cloudinary.uploader.destroy(oldPublicId)
-      category.image = imageUrl;
-    }
-
+    // 8️⃣ Save
     await category.save();
-    return res.json({ success: true, category });
+
+    return res.json({
+      success: true,
+      category,
+    });
   } catch (err) {
     console.error("updateCategory error:", err);
-    if (err && err.code === 11000) {
-      return res.status(409).json({ success: false, message: "Duplicate key — category exists" });
-    }
-    return res.status(500).json({ success: false, message: err?.message || "Server error" });
+    return res.status(500).json({
+      success: false,
+      message: err?.message || "Server error",
+    });
   }
 };
 
-module.exports={createCategory,getCategories,toggleCategory,updateCategory,getCategoriesUser}
+module.exports={createCategory,getCategories,toggleCategory,updateCategory,getCategoriesUser,getShopCategories}

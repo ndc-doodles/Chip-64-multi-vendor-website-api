@@ -1,4 +1,3 @@
-// middleware/multer.js
 const multer = require("multer");
 
 const storage = multer.memoryStorage();
@@ -6,12 +5,23 @@ const storage = multer.memoryStorage();
 const upload = multer({
   storage,
   limits: {
-    fileSize: 3 * 1024 * 1024, 
+    fileSize: 10 * 1024 * 1024, // 10MB
   },
   fileFilter: (req, file, cb) => {
-    if (!file.mimetype.startsWith("image/")) {
-      return cb(new Error("Only image uploads are allowed"), false);
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/jpg",
+      "application/pdf",
+    ];
+
+    if (!allowedTypes.includes(file.mimetype)) {
+      return cb(
+        new Error("Only JPG, PNG images or PDF files are allowed"),
+        false
+      );
     }
+
     cb(null, true);
   },
 });

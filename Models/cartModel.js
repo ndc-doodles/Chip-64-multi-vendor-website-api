@@ -1,37 +1,54 @@
 const mongoose= require("mongoose")
 const {Schema}=mongoose
+
 const cartItemSchema = new Schema(
   {
-    productId: { type: Schema.Types.ObjectId, ref: "Product", required: true },
-    variantId: { type: Schema.Types.ObjectId, required: false }, // optional if your variant is not separate collection
-    name: { type: String, required: true }, // snapshot
-    slug: { type: String, required: false },
-    image: { type: String, required: false }, // snapshot (main or variant image)
-    qty: { type: Number, required: true, default: 1, min: 1 },
-    price: {
-      type: Number,
+    productId: {
+      type: Schema.Types.ObjectId,
+      ref: "Product",
       required: true,
     },
-   
-    addedAt: { type: Date, default: Date.now },
-    color: { type: String, required: false, default: "" },
-    size: { type: String, required: false, default: "" },
-    options: { type: [{ name: String, value: String }], default: [] },
+    
+  vendorId: {
+    type: Schema.Types.ObjectId,
+    ref: "Vendor",
+    required: true,
+  },
+  variantId: {
+  type: Schema.Types.ObjectId,
+  required: true
+},
 
+    // snapshots
+    name: { type: String, required: true },
+    slug: { type: String },
+
+    sku: { type: String, default: "" }, 
+
+    image: { type: String, default: "" },
+
+    qty: { type: Number, required: true, min: 1, default: 1 },
+
+    price: { type: Number, required: true },
+
+    attributes: {
+      type: Map,
+      of: String,
+      default: {},
+    },
+
+    addedAt: { type: Date, default: Date.now },
   },
   { _id: true }
 );
 
 const cartSchema = new Schema(
   {
-    // associate a cart with a user (preferred) OR a sessionId for guest carts
     user: { type: Schema.Types.ObjectId, ref: "User", index: true, required: false },
     sessionId: { type: String, index: true, required: false },
 
-    // items array
     items: { type: [cartItemSchema], default: [] },
 
-    // cached totals for performance (you may keep them in sync in controllers)
     subtotal: { type: Number, default: 0 },
     currency: { type: String, default: "INR" },
 
@@ -45,61 +62,52 @@ cartSchema.methods.recalculate = function () {
   this.subtotal = (this.items || []).reduce((s, it) => s + Number(it.price || 0) * Number(it.qty || 1), 0);
   return this.subtotal;
 };
-// add after cartSchema.methods.recalculate = function () { ... }
-
-//
-// Instance methods
-//
-
-/**
- * Add an item snapshot to the cart (or increment qty if same product+variant exists).
- * itemSnapshot must contain: { productId, price, qty (optional), name, slug, image, variantId (optional) }
- */
-// replace your existing cartSchema.methods.addItem with this
-
+function normalizeAttributes(attrs = {}) {
+  return Object.keys(attrs)
+    .sort()
+    .reduce((acc, k) => {
+      acc[k] = attrs[k];
+      return acc;
+    }, {});
+}
 cartSchema.methods.addItem = async function (itemSnapshot) {
-  if (!itemSnapshot || !itemSnapshot.productId || typeof itemSnapshot.price === "undefined") {
-    throw new Error("Invalid item snapshot: productId and price required");
+  if (
+    !itemSnapshot ||
+    !itemSnapshot.productId ||
+    !itemSnapshot.vendorId ||
+    typeof itemSnapshot.price === "undefined"
+  ) {
+    throw new Error("Invalid item snapshot");
   }
 
   const productId = String(itemSnapshot.productId);
-  const variantId = itemSnapshot.variantId ? String(itemSnapshot.variantId) : null;
-  const sizeSnap = itemSnapshot.size ? String(itemSnapshot.size) : "";
-  const colorSnap = itemSnapshot.color ? String(itemSnapshot.color) : "";
+  const vendorId = String(itemSnapshot.vendorId);
+  const attrs = itemSnapshot.attributes || {};
+  const variantId = String(itemSnapshot.variantId);
 
-  // find existing line that matches product + variant + size + color
-  const existingIndex = this.items.findIndex((it) => {
-    const sameProduct = String(it.productId) === productId;
-    const sameVariant = variantId ? String(it.variantId) === variantId : !it.variantId;
-    const sameSize = (it.size || "") === sizeSnap;
-    const sameColor = (it.color || "") === colorSnap;
-    return sameProduct && sameVariant && sameSize && sameColor;
-  });
+
+ const existingIndex = this.items.findIndex(it =>
+  String(it.productId) === productId &&
+  String(it.variantId) === variantId
+);
 
   if (existingIndex >= 0) {
     const line = this.items[existingIndex];
-    line.qty = Number(line.qty || 0) + Number(itemSnapshot.qty || 1);
-    // update snapshot fields in case price/image/name changed
+    line.qty += Number(itemSnapshot.qty || 1);
     line.price = Number(itemSnapshot.price);
-    if (itemSnapshot.name) line.name = itemSnapshot.name;
-    if (itemSnapshot.slug) line.slug = itemSnapshot.slug;
-    if (itemSnapshot.image) line.image = itemSnapshot.image;
-    // update new snapshots as well
-    if (typeof itemSnapshot.size !== "undefined") line.size = itemSnapshot.size;
-    if (typeof itemSnapshot.color !== "undefined") line.color = itemSnapshot.color;
-    if (Array.isArray(itemSnapshot.options) && itemSnapshot.options.length) line.options = itemSnapshot.options;
+    line.image = itemSnapshot.image || line.image;
   } else {
     this.items.push({
       productId: itemSnapshot.productId,
-      variantId: itemSnapshot.variantId,
-      name: itemSnapshot.name || "",
-      slug: itemSnapshot.slug || "",
+      vendorId: itemSnapshot.vendorId,
+      name: itemSnapshot.name,
+      slug: itemSnapshot.slug,
       image: itemSnapshot.image || "",
       qty: Number(itemSnapshot.qty || 1),
       price: Number(itemSnapshot.price),
-      size: itemSnapshot.size || "",
-      color: itemSnapshot.color || "",
-      options: Array.isArray(itemSnapshot.options) ? itemSnapshot.options : [],
+      attributes: itemSnapshot.attributes || {},
+      sku: itemSnapshot.sku || "",
+      variantId:itemSnapshot.variantId
     });
   }
 
@@ -109,10 +117,8 @@ cartSchema.methods.addItem = async function (itemSnapshot) {
 };
 
 
-/**
- * Update quantity of a cart item (by cart subdocument _id).
- * If qty <= 0, the item will be removed.
- */
+
+
 cartSchema.methods.updateItemQty = async function (cartItemId, qty) {
   const idx = this.items.findIndex((it) => String(it._id) === String(cartItemId));
   if (idx === -1) throw new Error("Cart item not found");

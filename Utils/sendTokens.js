@@ -26,6 +26,9 @@ const sendTokens = (user, res,type="user", statusCode = 200) => {
         name: user.name,
         email: user.email,
         role: user.role,
+          authProvider: user?.authProvider,
+  recentLogins: user?.recentLogins?.slice(0, 5), 
+
       },
     });
 };

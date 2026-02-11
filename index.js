@@ -6,6 +6,7 @@ const connectDB = require("./Config/db");
 const authRoutes = require("./Routes/authRoutes");
 const adminRoutes=require("./Routes/adminRoutes")
 const userRoutes=require("./Routes/userRoutes")
+const vendorRoutes=require("./Routes/vendorRoutes")
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -22,8 +23,9 @@ app.use(
 );
 
 app.use("/auth", authRoutes);
-app.use("/admin",adminRoutes)
 app.use("/user",userRoutes)
+app.use("/vendor",vendorRoutes)
+app.use("/admin",adminRoutes)
 
 
 app.listen(PORT, () => {

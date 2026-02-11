@@ -6,7 +6,7 @@ const getOtpEmailHtml = ({ name, otp }) => {
   <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Leather Haven - OTP Verification</title>
+    <title>CHIP 64 - OTP Verification</title>
   </head>
   <body style="margin:0;padding:0;background-color:#f5f2ee;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
     <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f2ee;padding:24px 0;">
@@ -34,7 +34,7 @@ const getOtpEmailHtml = ({ name, otp }) => {
                   Hi ${name || "there"},
                 </p>
                 <p style="margin:0 0 16px 0;font-size:14px;color:#4b3b2b;line-height:1.5;">
-                  Use the one-time passcode below to verify your email and create your Leather Haven account.
+                  Use the one-time passcode below to verify your email and create your CHIP 64  account.
                 </p>
               </td>
             </tr>
@@ -81,10 +81,10 @@ const getOtpEmailHtml = ({ name, otp }) => {
             <tr>
               <td style="padding:16px 32px 24px 32px;text-align:center;">
                 <p style="margin:0 0 4px 0;font-size:11px;color:#b0a393;">
-                  Leather Haven · Timeless leather goods crafted to last
+                  CHIP 64 · Timeless leather goods crafted to last
                 </p>
                 <p style="margin:0;font-size:11px;color:#b0a393;">
-                  © ${new Date().getFullYear()} Leather Haven. All rights reserved.
+                  © ${new Date().getFullYear()} CHIP 64. All rights reserved.
                 </p>
               </td>
             </tr>
@@ -103,7 +103,7 @@ const getResetPasswordEmailHtml = ({ name, otp }) => {
   <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Leather Haven - Reset Password</title>
+    <title>CHIP 64 - Reset Password</title>
   </head>
   <body style="margin:0;padding:0;background-color:#f5f2ee;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
     <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f2ee;padding:24px 0;">
@@ -127,7 +127,7 @@ const getResetPasswordEmailHtml = ({ name, otp }) => {
                   Hi ${name || "there"},
                 </p>
                 <p style="margin:0 0 16px 0;font-size:14px;color:#4b3b2b;line-height:1.5;">
-                  You requested to reset your Leather Haven password. Use the code below to continue.
+                  You requested to reset your CHIP 64 password. Use the code below to continue.
                 </p>
               </td>
             </tr>
@@ -165,10 +165,10 @@ const getResetPasswordEmailHtml = ({ name, otp }) => {
             <tr>
               <td style="padding:16px 32px 24px 32px;text-align:center;">
                 <p style="margin:0 0 4px 0;font-size:11px;color:#b0a393;">
-                  Leather Haven · Timeless leather goods crafted to last
+                  CHIP 64 · Timeless leather goods crafted to last
                 </p>
                 <p style="margin:0;font-size:11px;color:#b0a393;">
-                  © ${new Date().getFullYear()} Leather Haven. All rights reserved.
+                  © ${new Date().getFullYear()} CHIP 64. All rights reserved.
                 </p>
               </td>
             </tr>
@@ -180,7 +180,53 @@ const getResetPasswordEmailHtml = ({ name, otp }) => {
   </html>
   `;
 };
+const getBrandApprovedEmailHtml = ({ name, brandName }) => {
+  return `
+  <html>
+    <body style="font-family:system-ui;background:#f5f2ee;padding:24px;">
+      <div style="max-width:480px;background:#fff;padding:24px;border-radius:16px;">
+        <h2 style="color:#2a2018;">Brand Approved 🎉</h2>
+        <p>Hi ${name || "Vendor"},</p>
+        <p>
+          Your brand <strong>${brandName}</strong> has been approved and is now
+          available on <strong>CHIP 64</strong>.
+        </p>
+        <p>You can now use this brand while creating products.</p>
+        <p style="margin-top:24px;font-size:12px;color:#777;">
+             CHIP 64 Team
+        </p>
+      </div>
+    </body>
+  </html>
+  `;
+};
+const getBrandRejectedEmailHtml = ({ name, brandName, adminNote }) => {
+  return `
+  <html>
+    <body style="font-family:system-ui;background:#f5f2ee;padding:24px;">
+      <div style="max-width:480px;background:#fff;padding:24px;border-radius:16px;">
+        <h2 style="color:#8b0000;">Brand Request Rejected</h2>
+        <p>Hi ${name || "Vendor"},</p>
+        <p>
+          Your brand request <strong>${brandName}</strong> was reviewed and
+          unfortunately rejected.
+        </p>
+        ${
+          adminNote
+            ? `<p><strong>Reason:</strong> ${adminNote}</p>`
+            : ""
+        }
+        <p>You may submit a new request with corrections.</p>
+        <p style="margin-top:24px;font-size:12px;color:#777;">
+          CHIP 64 Team
+        </p>
+      </div>
+    </body>
+  </html>
+  `;
+};
+
 
 module.exports = {
-  getOtpEmailHtml,getResetPasswordEmailHtml
+  getOtpEmailHtml,getResetPasswordEmailHtml,getBrandApprovedEmailHtml,getBrandRejectedEmailHtml
 };

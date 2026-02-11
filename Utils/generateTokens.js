@@ -8,6 +8,7 @@ const generateAccessToken = (user) => {
       id: user._id,
       email: user.email,
       role: user.role,
+      tokenVersion:user.tokenVersion
     },
     process.env.JWT_ACCESS_SECRET,
     { expiresIn: process.env.JWT_ACCESS_EXPIRES || "15m" }
@@ -22,6 +23,7 @@ const generateRefreshToken = (user) => {
       id: user._id,
       email: user.email,
       role: user.role,
+      tokenVersion:user.tokenVersion
     },
     process.env.JWT_REFRESH_SECRET,
     { expiresIn: process.env.JWT_REFRESH_EXPIRES || "7d" }
