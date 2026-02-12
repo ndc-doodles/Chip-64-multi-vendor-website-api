@@ -608,16 +608,21 @@ const searchProducts = async (req, res) => {
       return res.json([]);
     }
 
-    const products = await Product.find(
-      { $text: { $search: q } },   // 🔥 indexed search
-      {
-        score: { $meta: "textScore" } // relevance score
-      }
-    )
-      .sort({ score: { $meta: "textScore" } }) // best match first
+    // remove spaces
+    const cleaned = q.replace(/\s+/g, "");
+
+    // build flexible regex: i\s*p\s*h\s*o\s*n\s*e
+    const pattern = cleaned.split("").join("\\s*");
+
+    const regex = new RegExp(pattern, "i");
+
+    const products = await Product.find({
+      name: { $regex: regex }
+    })
       .select("name slug basePrice mainImage")
       .limit(5)
-      .lean(); // 🔥 faster (returns plain JS object)
+      .lean();
+
     res.json(products);
 
   } catch (err) {
