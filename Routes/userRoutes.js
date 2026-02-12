@@ -7,7 +7,7 @@ const {createAddress,getMyAddresses,updateAddress,deleteAddress,setDefaultAddres
 const {protect,isAdmin, optionalProtect}=require("../Middleware/authMiddleware")
 const {getProductsByCollection}=require("../Controllers/collectionController")
 const {getWishlist,toggleWishlist}=require("../Controllers/wishlistController")
-const { deleteAccount,deleteGoogleAccount } = require("../Controllers/userController")
+const { deleteAccount,deleteGoogleAccount, getAccountStats, sendContactMessage } = require("../Controllers/userController")
 const { validateCoupon ,getAvailableCoupons} = require("../Controllers/couponController")
 const{placeOrder,verifyRazorpay, getOrderById, getUserOrders, updateVendorItemStatus, getCheckoutItems}=require("../Controllers/orderController")
 const { createReview, updateReview, deleteReview, getProductReviews } = require("../Controllers/reviewController")
@@ -60,4 +60,6 @@ router.post("/buy-now", protect, buyNow);
 router.get("/checkout",protect,getCheckoutItems)
 router.get("/search-products",protect,searchProducts)
 router.get("/recently-viewed",protect,getRecentlyViewed)
+router.get("/account-stats",protect,getAccountStats)
+router.post("/contact",protect,sendContactMessage)
 module.exports=router
