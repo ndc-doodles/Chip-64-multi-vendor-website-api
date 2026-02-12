@@ -287,21 +287,25 @@ const googleLogin = async (req, res) => {
 
     const { email, name, sub: googleId } = googleRes.data;
 
-    let user = await User.findOne({ email });
-    if (user.isDeleted) {
+   let user = await User.findOne({ email });
+
+// FIRST create if not exists
+if (!user) {
+  user = await User.create({
+    name,
+    email,
+    googleId,
+    authProvider: "google",
+  });
+}
+
+// THEN check isDeleted
+if (user.isDeleted) {
   return res.status(403).json({
     message: "Account deleted. Contact support to restore.",
   });
 }
 
-    if (!user) {
-      user = await User.create({
-        name,
-        email,
-        googleId,
-        authProvider: "google",
-      });
-    }
 
     /* ================= LOGIN ACTIVITY ================= */
 
