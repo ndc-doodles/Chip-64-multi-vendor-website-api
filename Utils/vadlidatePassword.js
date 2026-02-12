@@ -19,9 +19,7 @@ const validatePassword = (password) => {
     return "Password must contain at least one number";
   }
 
-  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-    return "Password must contain at least one special character";
-  }
+
 
   if (/\s/.test(password)) {
     return "Password must not contain spaces";
