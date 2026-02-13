@@ -3,6 +3,8 @@ const User = require("../Models/userModel");
 const sendTokens = require("../Utils/sendTokens");
 const Order=require("../Models/orderModel")
 const Payout=require("../Models/payoutModel")
+const Vendor=require("../Models/vendorModel")
+const mongoose = require("mongoose");
 
 const adminLogin = async (req, res) => {
   try {
@@ -96,8 +98,6 @@ const unblockUser = async (req, res) => {
     res.status(500).json({ message: "Server error" })
   }
 }
-const Vendor = require("../Models/vendorModel");
-const mongoose = require("mongoose");
 
 /* ---------------- GET ALL VENDORS ---------------- */
 const getAllVendors = async (req, res) => {
@@ -325,6 +325,149 @@ const getAdminWallet = async (req, res) => {
   }
 };
 
+// ===============================
+// ADMIN DASHBOARD OVERVIEW
+// ===============================
+const getDashboardOverview = async (req, res) => {
+  try {
+    const { range = "daily" } = req.query;
+
+    /* =====================================================
+       1️⃣ COUNTS (parallel — fastest)
+    ===================================================== */
+    const [
+      totalUsers,
+      totalVendors,
+      pendingVendors,
+      totalOrders,
+    ] = await Promise.all([
+      User.countDocuments({ role: "user", isDeleted: false }),
+      Vendor.countDocuments({ status: "verified" }),
+      Vendor.countDocuments({ status: "pending" }),
+      Order.countDocuments(),
+    ]);
+
+
+
+    /* =====================================================
+       2️⃣ SALES + COMMISSION (parallel aggregations)
+    ===================================================== */
+    const [salesAgg, commissionAgg] = await Promise.all([
+
+      // TOTAL SALES
+      Order.aggregate([
+        { $match: { paymentStatus: "PAID" } },
+        {
+          $group: {
+            _id: null,
+            totalSales: { $sum: "$totalAmount" },
+          },
+        },
+      ]),
+
+      // TOTAL COMMISSION (items array)
+      Order.aggregate([
+        { $match: { paymentStatus: "PAID" } },
+        { $unwind: "$items" },
+        {
+          $group: {
+            _id: null,
+            totalCommission: { $sum: "$items.totalCommission" },
+          },
+        },
+      ]),
+    ]);
+
+    const totalSales = salesAgg[0]?.totalSales || 0;
+    const totalCommission = commissionAgg[0]?.totalCommission || 0;
+
+
+
+    /* =====================================================
+       3️⃣ DATE-BASED REVENUE CHART (FRONTEND FRIENDLY)
+    ===================================================== */
+
+    const groupBy =
+      range === "monthly"
+        ? { $dateToString: { format: "%Y-%m", date: "$createdAt" } }
+        : { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } };
+
+    const revenueChart = await Order.aggregate([
+      { $match: { paymentStatus: "PAID" } },
+
+      {
+        $group: {
+          _id: groupBy,
+          revenue: { $sum: "$totalAmount" },
+          orders: { $sum: 1 },
+        },
+      },
+
+      { $sort: { _id: 1 } },
+
+      {
+        $project: {
+          _id: 0,
+          date: "$_id",
+          revenue: 1,
+          orders: 1,
+        },
+      },
+    ]);
+
+
+
+    /* =====================================================
+       4️⃣ RECENT ORDERS
+    ===================================================== */
+    const recentOrders = await Order.find()
+      .sort({ createdAt: -1 })
+      .limit(8)
+      .populate("user", "name email")
+      .select("orderNumber totalAmount paymentStatus createdAt");
+
+
+
+    /* =====================================================
+       5️⃣ RECENT VENDOR REQUESTS
+    ===================================================== */
+    const recentVendors = await Vendor.find({ status: "pending" })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .select("storeName email phone createdAt");
+
+
+
+    /* =====================================================
+       RESPONSE
+    ===================================================== */
+    res.json({
+      success: true,
+
+      stats: {
+        totalSales,
+        totalCommission,
+        totalOrders,
+        totalUsers,
+        totalVendors,
+        pendingVendors,
+      },
+
+      revenueChart,
+      recentOrders,
+      recentVendors,
+    });
+
+  } catch (err) {
+    console.error("Dashboard error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to load dashboard overview",
+    });
+  }
+};
+
+
 
 module.exports = { adminLogin,unblockUser,blockUser,getUsers,getAllVendors,blockVendor,unblockVendor,getVendorById,approveVendor,rejectVendor
-  ,getAdminWallet,getWalletLedger};
+  ,getAdminWallet,getWalletLedger,getDashboardOverview};

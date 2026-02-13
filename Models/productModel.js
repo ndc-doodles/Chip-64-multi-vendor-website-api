@@ -15,6 +15,7 @@ const variantSchema = new Schema(
       type: Number,
       default: 0,
     },
+   
 
     images: [{ type: String }],
 
@@ -42,10 +43,7 @@ brand: {
   required: true,
 }
 ,
-isUsed:{
-  type:Boolean,
-  required:true
-},
+
 averageRating: {
   type: Number,
   default: 0,

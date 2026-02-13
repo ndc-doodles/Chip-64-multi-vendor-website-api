@@ -1,5 +1,5 @@
 const express=require("express")
-const {adminLogin,getUsers, blockUser,unblockUser, getAllVendors, blockVendor, unblockVendor, getVendorById,approveVendor,rejectVendor, getAdminWallet, getWalletLedger}=require("../Controllers/adminController")
+const {adminLogin,getUsers, blockUser,unblockUser, getAllVendors, blockVendor, unblockVendor, getVendorById,approveVendor,rejectVendor, getAdminWallet, getWalletLedger, getDashboardOverview}=require("../Controllers/adminController")
 const {getCategories,createCategory,toggleCategory,updateCategory}=require("../Controllers/categoryController")
 const{createProduct,listProducts,updateProduct,toggleProduct}=require("../Controllers/productController")
 const {createBrand,approveBrandRequest,getBrandRequests,rejectBrandRequest, getBrands}=require("../Controllers/brandController")
@@ -69,5 +69,6 @@ router.get("/wallet/ledger",protect,isAdmin,getWalletLedger)
 router.get( "/payout-requests",protect,isAdmin,getPayoutRequests)
 router.get("/payout-request",protect,isAdmin ,approvePayoutRequest)
 
+router.get("/dashboard/overview", protect,isAdmin,getDashboardOverview);
 
 module.exports=router

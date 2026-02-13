@@ -58,7 +58,7 @@ router.get("/product/:id/reviews", getProductReviews);
 router.post("/buy-now", protect, buyNow);
 
 router.get("/checkout",protect,getCheckoutItems)
-router.get("/search-products",protect,searchProducts)
+router.get("/search-products",searchProducts)
 router.get("/recently-viewed",protect,getRecentlyViewed)
 router.get("/account-stats",protect,getAccountStats)
 router.post("/contact",protect,sendContactMessage)
