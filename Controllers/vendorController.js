@@ -107,6 +107,11 @@ const mainImageFile = req.files.mainImage[0];
 
 
     /* ------------------ Slug ------------------ */
+    const baseSlug = name
+  .trim()
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, "-")
+  .replace(/^-|-$/g, "");
    
 // ❌ Block if SAME vendor already has this product
 const sameVendorProduct = await Product.findOne({

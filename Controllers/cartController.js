@@ -20,29 +20,28 @@ const getCart = async (req, res) => {
 const addItem = async (req, res) => {
   try {
     const userId = req.user?.id;
-    if (!userId)
-      return res.status(401).json({ success: false, message: "Unauthorized" });
-     console.log(req.body)
+
     const {
       productId,
       vendorId,
       qty = 1,
-      price,
       name,
       slug,
       image,
       attributes,
-      variantId // 🔑 THIS IS THE VARIANT
+      variantId
     } = req.body;
-     console.log(variantId)
-    if (!productId || !vendorId || price == null|| !variantId) {
+
+    if (!productId || !vendorId || !variantId) {
       return res.status(400).json({
-        success: false,
-        message: "productId, vendorId , variantId and price are required",
+        message: "productId, vendorId and variantId are required",
       });
     }
-        await BuyNow.deleteOne({ user: userId });
 
+    const product = await Product.findById(productId);
+    const variant = product.variants.id(variantId);
+
+    const finalPrice = variant.price ?? product.basePrice;
 
     const cart = await Cart.findOrCreateFor({ userId });
 
@@ -50,20 +49,21 @@ const addItem = async (req, res) => {
       productId,
       vendorId,
       qty,
-      price,
+      price: finalPrice,
       name,
       slug,
       image,
       attributes,
-      variantId 
+      variantId,
     });
 
-    return res.json({ success: true, cart });
+    res.json({ success: true, cart });
+
   } catch (err) {
-    console.error("addItem error:", err);
-    return res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, message: err.message });
   }
 };
+
 
 
 const updateItemQty = async (req, res) => {

@@ -30,6 +30,11 @@ const wishlistItemSchema = new Schema(
       of: String,
       default: {},
     },
+     price: {
+      type: Number,   // 🔥 ADD THIS
+      required: true,
+    },
+
 
     addedAt: { type: Date, default: Date.now },
   },
